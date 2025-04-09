@@ -15,9 +15,9 @@
 
 void power_key_update_reg() {
   // Bit 7 is shutdown now
-  bool shutdown_now = reg_is_bit_set(REG_ID_POWER, 7);
-  // If shutdown_now is set, the PMU will shutdown immediately
-  if (shutdown_now) {
+  bool shutdown = reg_is_bit_set(REG_ID_POWER, 7);
+  // If shutdown is set, the PMU will shutdown immediately
+  if (shutdown) {
     shutdown_now();
 
     return;
