@@ -74,7 +74,7 @@ static void key_cb(char key, enum key_state state) {
      fifo_flush();
      return;
   }
-  
+
   if (reg_is_bit_set(REG_ID_CFG, CFG_KEY_INT)) {
     reg_set_bit(REG_ID_INT, INT_KEY);
     do_int = true;
@@ -122,46 +122,71 @@ void receiveEvent(int howMany) {
   write_buffer[0] = 0;
   write_buffer[1] = 0;
   write_buffer_len = 2;
-  
+
   switch (reg) {
     case REG_ID_FIF: {
       const struct fifo_item item = fifo_dequeue();
       write_buffer[0] = (uint8_t)item.state;
       write_buffer[1] = (uint8_t)item.key;
+
     } break;
     case REG_ID_BKL: {
       reg_set_value(REG_ID_BKL, rcv_data[1]);
       lcd_backlight_update_reg();
       write_buffer[0] = reg;
       write_buffer[1] = reg_get_value(REG_ID_BKL);
+
+    } break;
+    case REG_ID_BK2: {
+      reg_set_value(REG_ID_BKL, rcv_data[1]);
+      kbd_backlight_update_reg();
+      write_buffer[0] = reg;
+      write_buffer[1] = reg_get_value(REG_ID_BK2);
+
     } break;
     case REG_ID_BAT:{
       //Serial1.print("REG_ID_BAT getBatteryPercent:");Serial1.print(current_bat_pcnt);Serial1.println("%");
       write_buffer[0] = reg;
       write_buffer[1] = (uint8_t)current_bat_pcnt;
-      
-    }break;
+
+    } break;
     case REG_ID_KEY: {
       write_buffer[0] = fifo_count();
       write_buffer[0] |= keyboard_get_numlock()  ? KEY_NUMLOCK  : 0x00;
       write_buffer[0] |= keyboard_get_capslock() ? KEY_CAPSLOCK : 0x00;
 
-    }break;
+    } break;
     case REG_ID_C64_MTX:{
       write_buffer[0] = reg;
       memcpy(write_buffer + 1, io_matrix, sizeof(io_matrix));
       write_buffer_len = 10;
-    }break;
+
+    } break;
     case REG_ID_C64_JS:{
       write_buffer[0] = reg;
       write_buffer[1] = js_bits;
       write_buffer_len = 2;
-    }break;
+
+    } break;
+    case REG_ID_VER: {
+      write_buffer[0] = reg;
+      write_buffer[1] = VER_VAL;
+      write_buffer_len = 2;
+
+    } break;
+    case REG_ID_POWER: {
+      reg_set_value(REG_ID_POWER, rcv_data[1]);
+      power_key_update_reg();
+      write_buffer[0] = reg;
+      write_buffer[1] = reg_get_value(REG_ID_POWER);
+      write_buffer_len = 2;
+
+    } break;
     default: {
       write_buffer[0] = 0;
       write_buffer[1] = 0;
-
       write_buffer_len = 2;
+
     } break;
   }
 }
@@ -174,9 +199,17 @@ void report_bat(){
     write_buffer[0] = REG_ID_BAT;
     write_buffer[1] = PMU.getBatteryPercent();
 
-    write_buffer_len = 2;  
+    write_buffer_len = 2;
     requestEvent();
   }
+}
+
+void report_power(uint8_t power_status) {
+  write_buffer[0] = REG_ID_POWER;
+  write_buffer[1] = power_status;
+
+  write_buffer_len = 2;
+  requestEvent();
 }
 
 void printPMU() {
@@ -232,7 +265,7 @@ void check_pmu_int() {
   int pcnt;
 
   if (!pmu_online) return;
-  
+
   if (time_uptime_ms() - run_time > 20000) {
     run_time = millis();  // reset time
     pcnt = PMU.getBatteryPercent();
@@ -271,11 +304,10 @@ void check_pmu_int() {
     }
 
     // When the set low-voltage battery percentage shutdown threshold is reached
-    // set the threshold through setLowBatShutdownThreshold()  
+    // set the threshold through setLowBatShutdownThreshold()
     //This is related to the battery charging and discharging logic. If you're not sure what you're doing, please don't modify it, as it could damage the battery.
     if (PMU.isDropWarningLevel1Irq()) {
       report_bat();
-      //
       PMU.shutdown();
     }
     if (PMU.isGaugeWdtTimeoutIrq()) {
@@ -317,7 +349,6 @@ void check_pmu_int() {
 
     if (PMU.isPekeyShortPressIrq()) {
       Serial1.println("isPekeyShortPress");
-      // enterPmuSleep();
 
       Serial1.print("Read pmu data buffer .");
       uint8_t data[4] = {0};
@@ -329,6 +360,14 @@ void check_pmu_int() {
       Serial1.println();
 
       printPMU();
+
+      if (reg_is_bit_set(REG_ID_POWER, 6)) {
+        // Let the MCU manage power actions
+        report_power(POWER_SHORT_PRESS);
+      } else {
+        // Manage shutdown here
+         sleep_now();
+      }
     }
 
     if (PMU.isPekeyLongPressIrq()) {
@@ -336,10 +375,14 @@ void check_pmu_int() {
       //Serial1.println("write pmu data buffer .");
       //uint8_t data[4] = {1, 2, 3, 4};
       //PMU.writeDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
-      digitalWrite(PA13, LOW);
-      digitalWrite(PA14, LOW);
-      PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
-      PMU.shutdown();
+
+      if (reg_is_bit_set(REG_ID_POWER, 6)) {
+        // Let the MCU manage power actions
+        report_power(POWER_LONG_PRESS);
+      } else {
+        // Manage shutdown here
+         shutdown_now();
+      }
     }
 
     if (PMU.isPekeyNegativeIrq()) {
@@ -403,7 +446,7 @@ void setup() {
   pinMode(PA13, OUTPUT);  // pico enable
   digitalWrite(PA13, LOW);
   reg_init();
-  
+
   Serial1.begin(115200);
 
   Wire.setSDA(PB9);
@@ -414,7 +457,7 @@ void setup() {
   Wire.onRequest(requestEvent);
 
   // no delay here
-   
+
   bool result = PMU.begin(Wire2, AXP2101_SLAVE_ADDRESS, i2c_sda, i2c_scl);
 
   if (result == false) {
@@ -423,7 +466,7 @@ void setup() {
     pmu_online = 1;
     Serial1.printf("getID:0x%x\n", PMU.getChipID());
   }
-   
+
   pinMode(PC12, INPUT);  // HP_DET
 
   pinMode(PC13, OUTPUT);  // indicator led
@@ -432,7 +475,7 @@ void setup() {
 
   pinMode(PA14, OUTPUT);  // PA_EN
   digitalWrite(PA14, HIGH);
-  
+
   int pin = PC8;
 
   /*
@@ -472,7 +515,7 @@ void setup() {
   keyboard_init();
   keyboard_set_key_callback(key_cb);
   lcd_backlight_update(-223);
-  
+
   digitalWrite(PA13, HIGH);
 
 
@@ -486,7 +529,7 @@ void setup() {
   PMU.enableVbusVoltageMeasure();
   PMU.enableBattVoltageMeasure();
   PMU.enableSystemVoltageMeasure();
-  
+
   PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 
   pinMode(pmu_irq_pin, INPUT_PULLUP);
@@ -521,7 +564,7 @@ void setup() {
     // 5%  ~= 3.5V
     // 1%  ~= 3.4V
   PMU.setLowBatShutdownThreshold(1);  //This is related to the battery charging and discharging logic. If you're not sure what you're doing, please don't modify it, as it could damage the battery.
-  
+
   run_time = 0;
   keycb_start = 1;
   low_bat();
@@ -540,7 +583,7 @@ void check_hp_det(){
     digitalWrite(PA14,HIGH);
   }
   head_phone_status = v;
-  
+
 }
 void loop() {
   check_pmu_int();

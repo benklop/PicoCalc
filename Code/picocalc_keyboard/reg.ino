@@ -22,6 +22,16 @@ void reg_set_bit(enum reg_id reg, uint8_t bit)
   regs[reg] |= bit;
 }
 
+uint8_t reg_get_bits(enum reg_id reg, uint8_t offset, uint8_t len)
+{
+  if (len == 0 || offset + len > 8)
+  {
+    return 0; // Return 0 if length is zero or exceeds the bit width of uint8_t
+  }
+  uint8_t mask = (1 << len) - 1;
+  return (regs[reg] >> offset) & mask;
+}
+
 /*
  * | Bit    | Name             | Description                                                        |
 | ------ |:----------------:| ------------------------------------------------------------------:|
@@ -41,5 +51,5 @@ void reg_init(void)
   regs[REG_ID_FRQ] = 5;
   regs[REG_ID_BKL] = 255;//100%duty
   regs[REG_ID_BK2] = 0;
-  regs[REG_ID_BAT] = 0xff; //default .no battery 
+  regs[REG_ID_BAT] = 0xff; //default .no battery
 }

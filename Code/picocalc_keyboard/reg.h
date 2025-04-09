@@ -15,12 +15,16 @@ enum reg_id
   REG_ID_FRQ = 0x07, // poll freq cfg
   REG_ID_RST = 0x08, // reset
   REG_ID_FIF = 0x09, // fifo
-  REG_ID_BK2 = 0x0A, //keyboard backlight
+  REG_ID_BK2 = 0x0a, //keyboard backlight
   REG_ID_BAT = 0x0b,// battery
   REG_ID_C64_MTX = 0x0c,// read c64 matrix
   REG_ID_C64_JS = 0x0d, // joystick io bits
+  REG_ID_POWER = 0x0e, // power management
   REG_ID_LAST,
 };
+
+#define POWER_LONG_PRESS  (1 << 0) // Power key long press
+#define POWER_SHORT_PRESS (1 << 1) // Power key short press
 
 #define CFG_OVERFLOW_ON   (1 << 0) //When a FIFO overflow happens, should the new entry still be pushed, overwriting the oldest one. If 0 then new entry is lost.
 #define CFG_OVERFLOW_INT  (1 << 1) //Should an interrupt be generated when a FIFO overflow happens
@@ -42,7 +46,7 @@ enum reg_id
 #define KEY_NUMLOCK     (1 << 6)
 #define KEY_COUNT_MASK    0x1F  //0x1F == 31
 
-#define VER_VAL       ((VERSION_MAJOR << 4) | (VERSION_MINOR << 0))
+#define VER_VAL       ((VERSION_MAJOR << 5) | (VERSION_MINOR << 0))
 
 #define WRITE_MASK (1<<7)
 
@@ -50,6 +54,7 @@ uint8_t reg_get_value(enum reg_id reg);
 void reg_set_value(enum reg_id reg, uint8_t value);
 bool reg_is_bit_set(enum reg_id reg, uint8_t bit);
 void reg_set_bit(enum reg_id reg, uint8_t bit);
+uint8_t reg_get_bits(enum reg_id reg, uint8_t offset, uint8_t len);
 void reg_init(void);
 
 #endif
