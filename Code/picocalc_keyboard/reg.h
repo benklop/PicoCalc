@@ -23,9 +23,6 @@ enum reg_id
   REG_ID_LAST,
 };
 
-#define POWER_LONG_PRESS  (1 << 0) // Power key long press
-#define POWER_SHORT_PRESS (1 << 1) // Power key short press
-
 #define CFG_OVERFLOW_ON   (1 << 0) //When a FIFO overflow happens, should the new entry still be pushed, overwriting the oldest one. If 0 then new entry is lost.
 #define CFG_OVERFLOW_INT  (1 << 1) //Should an interrupt be generated when a FIFO overflow happens
 #define CFG_CAPSLOCK_INT  (1 << 2) //Should an interrupt be generated when Caps Lock is toggled.

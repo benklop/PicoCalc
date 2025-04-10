@@ -69,7 +69,7 @@ void shutdown_now() {
   PMU.shutdown();
 }
 
-// no idea if this is correct yet.
+// no idea how to do this yet
 void sleep_now() {
   //PMU.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
   //PMU.sleep();

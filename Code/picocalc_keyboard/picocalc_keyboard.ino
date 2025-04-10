@@ -362,27 +362,18 @@ void check_pmu_int() {
       printPMU();
 
       if (reg_is_bit_set(REG_ID_POWER, 6)) {
-        // Let the MCU manage power actions
-        report_power(POWER_SHORT_PRESS);
+        Serial1.println("send power key");
+        report_power(reg_get_value(REG_ID_POWER));
+
       } else {
-        // Manage shutdown here
+        // Manage sleep here
          sleep_now();
       }
     }
 
     if (PMU.isPekeyLongPressIrq()) {
       Serial1.println("isPekeyLongPress");
-      //Serial1.println("write pmu data buffer .");
-      //uint8_t data[4] = {1, 2, 3, 4};
-      //PMU.writeDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
-
-      if (reg_is_bit_set(REG_ID_POWER, 6)) {
-        // Let the MCU manage power actions
-        report_power(POWER_LONG_PRESS);
-      } else {
-        // Manage shutdown here
-         shutdown_now();
-      }
+      shutdown_now();
     }
 
     if (PMU.isPekeyNegativeIrq()) {
